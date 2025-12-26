@@ -143,12 +143,20 @@ export default function SettingsPage() {
                   <Label htmlFor="rotation-method">Rotation Method</Label>
                   <Select
                     value={settings.rotation.method}
-                    onValueChange={(value: any) =>
+                    onValueChange={(value: any) => {
+                      const updatedRotation = { ...settings.rotation, method: value };
+                      // Initialize rate_limited settings if method is rate-limited
+                      if ((value === "rate-limited" || value === "rate_limited") && !updatedRotation.rate_limited) {
+                        updatedRotation.rate_limited = {
+                          max_requests_per_minute: 30,
+                          window_seconds: 60,
+                        };
+                      }
                       setSettings({
                         ...settings,
-                        rotation: { ...settings.rotation, method: value },
-                      })
-                    }
+                        rotation: updatedRotation,
+                      });
+                    }}
                   >
                     <SelectTrigger id="rotation-method">
                       <SelectValue placeholder="Select method" />
@@ -158,6 +166,7 @@ export default function SettingsPage() {
                       <SelectItem value="roundrobin">Round Robin</SelectItem>
                       <SelectItem value="least_conn">Least Connections</SelectItem>
                       <SelectItem value="time_based">Time Based</SelectItem>
+                      <SelectItem value="rate-limited">Rate Limited</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
@@ -180,6 +189,61 @@ export default function SettingsPage() {
                       }
                     />
                   </div>
+                )}
+
+                {(settings.rotation.method === "rate-limited" || settings.rotation.method === "rate_limited") && (
+                  <>
+                    <div className="space-y-2">
+                      <Label htmlFor="rate-limited-max">Max Requests Per Minute</Label>
+                      <Input
+                        id="rate-limited-max"
+                        type="number"
+                        min="1"
+                        value={settings.rotation.rate_limited?.max_requests_per_minute || 30}
+                        onChange={(e) =>
+                          setSettings({
+                            ...settings,
+                            rotation: {
+                              ...settings.rotation,
+                              rate_limited: {
+                                ...settings.rotation.rate_limited,
+                                max_requests_per_minute: parseInt(e.target.value) || 30,
+                                window_seconds: settings.rotation.rate_limited?.window_seconds || 60,
+                              },
+                            },
+                          })
+                        }
+                      />
+                      <p className="text-xs text-muted-foreground">
+                        Maximum number of requests allowed per proxy within the time window
+                      </p>
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="rate-limited-window">Time Window (seconds)</Label>
+                      <Input
+                        id="rate-limited-window"
+                        type="number"
+                        min="1"
+                        value={settings.rotation.rate_limited?.window_seconds || 60}
+                        onChange={(e) =>
+                          setSettings({
+                            ...settings,
+                            rotation: {
+                              ...settings.rotation,
+                              rate_limited: {
+                                ...settings.rotation.rate_limited,
+                                max_requests_per_minute: settings.rotation.rate_limited?.max_requests_per_minute || 30,
+                                window_seconds: parseInt(e.target.value) || 60,
+                              },
+                            },
+                          })
+                        }
+                      />
+                      <p className="text-xs text-muted-foreground">
+                        Time window in seconds for rate limiting (default: 60 = 1 minute)
+                      </p>
+                    </div>
+                  </>
                 )}
 
                 <div className="space-y-2">

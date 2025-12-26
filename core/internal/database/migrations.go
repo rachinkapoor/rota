@@ -89,7 +89,7 @@ var migrations = []Migration{
 			-- Note: authentication settings are for PROXY server (port 8000), not dashboard/API
 			INSERT INTO settings (key, value) VALUES
 			('authentication', '{"enabled": false, "username": "", "password": ""}'::jsonb),
-			('rotation', '{"method": "random", "time_based": {"interval": 120}, "remove_unhealthy": true, "fallback": true, "fallback_max_retries": 10, "follow_redirect": false, "timeout": 90, "retries": 3}'::jsonb),
+			('rotation', '{"method": "random", "time_based": {"interval": 120}, "rate_limited": {"max_requests_per_minute": 30, "window_seconds": 60}, "remove_unhealthy": true, "fallback": true, "fallback_max_retries": 10, "follow_redirect": false, "timeout": 90, "retries": 3}'::jsonb),
 			('rate_limit', '{"enabled": false, "interval": 1, "max_requests": 100}'::jsonb),
 			('healthcheck', '{"timeout": 60, "workers": 20, "url": "https://api.ipify.org", "status": 200, "headers": ["User-Agent: Rota-HealthCheck/1.0"]}'::jsonb),
 			('log_retention', '{"enabled": true, "retention_days": 30, "compression_after_days": 7, "cleanup_interval_hours": 24}'::jsonb)
@@ -243,6 +243,28 @@ var migrations = []Migration{
 			UPDATE settings
 			SET value = jsonb_set(value, '{timeout}', '30')
 			WHERE key = 'healthcheck';
+		`,
+	},
+	{
+		Version:     11,
+		Description: "Add rate-limited rotation settings",
+		Up: `
+			-- Add rate_limited settings to existing rotation configuration
+			-- Only add if rate_limited key doesn't exist
+			UPDATE settings
+			SET value = jsonb_set(
+				value,
+				'{rate_limited}',
+				'{"max_requests_per_minute": 30, "window_seconds": 60}'::jsonb
+			)
+			WHERE key = 'rotation'
+			AND NOT (value ? 'rate_limited');
+		`,
+		Down: `
+			-- Remove rate_limited settings from rotation configuration
+			UPDATE settings
+			SET value = value - 'rate_limited'
+			WHERE key = 'rotation';
 		`,
 	},
 }

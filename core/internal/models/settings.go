@@ -22,22 +22,29 @@ type AuthenticationSettings struct {
 
 // RotationSettings represents proxy rotation configuration
 type RotationSettings struct {
-	Method             string            `json:"method"`
-	TimeBased          TimeBasedSettings `json:"time_based,omitempty"`
-	RemoveUnhealthy    bool              `json:"remove_unhealthy"`
-	Fallback           bool              `json:"fallback"`
-	FallbackMaxRetries int               `json:"fallback_max_retries"`
-	FollowRedirect     bool              `json:"follow_redirect"`
-	Timeout            int               `json:"timeout"`
-	Retries            int               `json:"retries"`
-	AllowedProtocols   []string          `json:"allowed_protocols"` // ["http", "https", "socks4", "socks4a", "socks5"], empty means all
-	MaxResponseTime    int               `json:"max_response_time"` // in milliseconds, 0 means no limit
-	MinSuccessRate     float64           `json:"min_success_rate"`  // 0-100, 0 means no minimum
+	Method             string              `json:"method"`
+	TimeBased          TimeBasedSettings   `json:"time_based,omitempty"`
+	RateLimited        RateLimitedSettings `json:"rate_limited,omitempty"`
+	RemoveUnhealthy    bool                `json:"remove_unhealthy"`
+	Fallback           bool                `json:"fallback"`
+	FallbackMaxRetries int                 `json:"fallback_max_retries"`
+	FollowRedirect     bool                `json:"follow_redirect"`
+	Timeout            int                 `json:"timeout"`
+	Retries            int                 `json:"retries"`
+	AllowedProtocols   []string            `json:"allowed_protocols"` // ["http", "https", "socks4", "socks4a", "socks5"], empty means all
+	MaxResponseTime    int                 `json:"max_response_time"` // in milliseconds, 0 means no limit
+	MinSuccessRate     float64             `json:"min_success_rate"`  // 0-100, 0 means no minimum
 }
 
 // TimeBasedSettings represents time-based rotation settings
 type TimeBasedSettings struct {
 	Interval int `json:"interval"` // in seconds
+}
+
+// RateLimitedSettings represents rate-limited rotation settings
+type RateLimitedSettings struct {
+	MaxRequestsPerMinute int `json:"max_requests_per_minute"` // Maximum requests per proxy per time window (default: 30)
+	WindowSeconds        int `json:"window_seconds"`           // Time window in seconds (default: 60)
 }
 
 // RateLimitSettings represents rate limiting configuration

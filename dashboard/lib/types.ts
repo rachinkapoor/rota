@@ -98,9 +98,13 @@ export interface Settings {
     password: string
   }
   rotation: {
-    method: "random" | "roundrobin" | "least_conn" | "time_based"
+    method: "random" | "roundrobin" | "least_conn" | "time_based" | "rate-limited" | "rate_limited"
     time_based?: {
       interval: number
+    }
+    rate_limited?: {
+      max_requests_per_minute: number
+      window_seconds: number
     }
     remove_unhealthy: boolean
     fallback: boolean
