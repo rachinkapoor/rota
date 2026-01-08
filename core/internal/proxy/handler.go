@@ -46,8 +46,15 @@ func (h *UpstreamProxyHandler) HandleRequest(req *http.Request, ctx *goproxy.Pro
 	startTime := time.Now()
 	requestID := uuid.New().String()
 
+	// Determine source based on target host
+	source := "proxy"
+	urlStr := req.URL.String()
+	if strings.Contains(req.URL.Host, "api.hyperliquid.xyz") || strings.Contains(urlStr, "api.hyperliquid.xyz") {
+		source = "hl-proxy"
+	}
+
 	h.logger.Info("handling proxy request",
-		"source", "proxy",
+		"source", source,
 		"request_id", requestID,
 		"method", req.Method,
 		"url", req.URL.String(),
@@ -92,7 +99,7 @@ func (h *UpstreamProxyHandler) HandleRequest(req *http.Request, ctx *goproxy.Pro
 
 	if err != nil {
 		h.logger.Error("proxy request failed",
-			"source", "proxy",
+			"source", source,
 			"request_id", requestID,
 			"method", req.Method,
 			"url", req.URL.String(),
@@ -103,7 +110,7 @@ func (h *UpstreamProxyHandler) HandleRequest(req *http.Request, ctx *goproxy.Pro
 	}
 
 	h.logger.Info("proxy request completed",
-		"source", "proxy",
+		"source", source,
 		"request_id", requestID,
 		"method", req.Method,
 		"url", req.URL.String(),

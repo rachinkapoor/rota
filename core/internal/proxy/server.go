@@ -3,8 +3,11 @@ package proxy
 import (
 	"context"
 	"fmt"
+	"io"
 	"net"
 	"net/http"
+	"net/url"
+	"strings"
 	"time"
 
 	"github.com/alpkeskin/rota/core/internal/repository"
@@ -103,6 +106,33 @@ func New(
 
 	// HTTP requests
 	proxyServer.OnRequest().DoFunc(func(req *http.Request, ctx *goproxy.ProxyCtx) (*http.Request, *http.Response) {
+		// Intercept /hyperliquid/{path} requests and rewrite to api.hyperliquid.xyz
+		if req.URL.Path == "/hyperliquid" || strings.HasPrefix(req.URL.Path, "/hyperliquid/") {
+			// Extract the path after /hyperliquid
+			hyperliquidPath := strings.TrimPrefix(req.URL.Path, "/hyperliquid")
+			if hyperliquidPath == "" {
+				hyperliquidPath = "/"
+			}
+
+			// Build new URL: https://api.hyperliquid.xyz/{path}
+			newURL := fmt.Sprintf("https://api.hyperliquid.xyz%s", hyperliquidPath)
+			if req.URL.RawQuery != "" {
+				newURL += "?" + req.URL.RawQuery
+			}
+
+			// Parse the new URL
+			parsedURL, err := url.Parse(newURL)
+			if err != nil {
+				log.Error("failed to parse hyperliquid URL", "url", newURL, "error", err)
+				return req, goproxy.NewResponse(req, goproxy.ContentTypeText, http.StatusBadGateway, "Failed to parse hyperliquid URL")
+			}
+
+			// Update request URL
+			req.URL = parsedURL
+			req.Host = "api.hyperliquid.xyz"
+			req.Header.Set("Host", "api.hyperliquid.xyz")
+		}
+
 		// Authentication middleware
 		if req, resp := authMiddleware.HandleRequest(req, ctx); resp != nil {
 			return req, resp
@@ -135,9 +165,118 @@ func New(
 		return goproxy.OkConnect, host
 	}))
 
+	// Create a wrapper handler that intercepts direct HTTP requests to /hyperliquid/*
+	// before they reach goproxy (which only handles proxy requests)
+	wrapperHandler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		log.Info("incoming request",
+			"source", "proxy",
+			"method", r.Method,
+			"path", r.URL.Path,
+			"host", r.Host,
+		)
+		
+		// Check if this is a direct HTTP request to /hyperliquid/*
+		if r.URL.Path == "/hyperliquid" || strings.HasPrefix(r.URL.Path, "/hyperliquid/") {
+			log.Info("intercepting hyperliquid request",
+				"source", "proxy",
+				"path", r.URL.Path,
+			)
+			// This is a direct HTTP request, not a proxy request
+			// Handle it directly by calling the handler logic
+			
+			// Extract the path after /hyperliquid
+			hyperliquidPath := strings.TrimPrefix(r.URL.Path, "/hyperliquid")
+			if hyperliquidPath == "" {
+				hyperliquidPath = "/"
+			}
+
+			// Build new URL: https://api.hyperliquid.xyz/{path}
+			newURL := fmt.Sprintf("https://api.hyperliquid.xyz%s", hyperliquidPath)
+			if r.URL.RawQuery != "" {
+				newURL += "?" + r.URL.RawQuery
+			}
+
+			// Parse the new URL
+			parsedURL, err := url.Parse(newURL)
+			if err != nil {
+				log.Error("failed to parse hyperliquid URL", "url", newURL, "error", err)
+				http.Error(w, "Failed to parse hyperliquid URL", http.StatusBadGateway)
+				return
+			}
+
+			// Create a new request with the rewritten URL
+			// Clone preserves the body, method, headers, etc.
+			newReq := r.Clone(r.Context())
+			newReq.URL = parsedURL
+			newReq.Host = "api.hyperliquid.xyz"
+			newReq.Header.Set("Host", "api.hyperliquid.xyz")
+			// Ensure RequestURI is cleared for client requests
+			newReq.RequestURI = ""
+			
+			// Create a proxy context for the handler
+			// The handler uses ctx.Req.Context(), so we need to set Req to newReq
+			proxyCtx := &goproxy.ProxyCtx{
+				Req:     newReq, // Handler uses ctx.Req.Context()
+				Resp:    nil,
+				Session: 0,
+			}
+
+			// Process through middleware and handler
+			// Authentication middleware (skip for public endpoint - /hyperliquid/* is public)
+			// Rate limiting middleware
+			if _, resp := rateLimitMw.HandleRequest(newReq, proxyCtx); resp != nil {
+				log.Info("rate limited",
+					"source", "hl-proxy",
+					"path", r.URL.Path,
+				)
+				resp.Write(w)
+				return
+			}
+
+			// Main handler - this will forward through proxy pool
+			// The handler modifies the request, so we pass newReq
+			log.Info("calling handler for hyperliquid request",
+				"source", "hl-proxy",
+				"url", newReq.URL.String(),
+			)
+			_, resp := handler.HandleRequest(newReq, proxyCtx)
+			if resp != nil {
+				// Copy response headers
+				for key, values := range resp.Header {
+					for _, value := range values {
+						w.Header().Add(key, value)
+					}
+				}
+				w.WriteHeader(resp.StatusCode)
+				
+				// Copy response body
+				if resp.Body != nil {
+					defer resp.Body.Close()
+					io.Copy(w, resp.Body)
+				}
+				return
+			}
+
+			// If no response, return error
+			log.Error("no response from handler",
+				"source", "proxy",
+				"path", r.URL.Path,
+			)
+			http.Error(w, "No response from handler", http.StatusInternalServerError)
+			return
+		}
+
+		// For all other requests, pass through to goproxy (proxy requests)
+		log.Info("passing request to goproxy",
+			"source", "proxy",
+			"path", r.URL.Path,
+		)
+		proxyServer.ServeHTTP(w, r)
+	})
+
 	httpServer := &http.Server{
 		Addr:         fmt.Sprintf(":%d", port),
-		Handler:      proxyServer,
+		Handler:      wrapperHandler,
 		ReadTimeout:  time.Duration(settings.Rotation.Timeout) * time.Second,
 		WriteTimeout: time.Duration(settings.Rotation.Timeout) * time.Second,
 		IdleTimeout:  60 * time.Second,
