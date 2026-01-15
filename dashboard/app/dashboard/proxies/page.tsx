@@ -116,6 +116,7 @@ export default function ProxiesPage() {
   const [importResults, setImportResults] = React.useState<Array<{ address: string; status: string; error?: string }>>([])
   const [isDragging, setIsDragging] = React.useState(false)
   const [isReloading, setIsReloading] = React.useState(false)
+  const [isBulkTesting, setIsBulkTesting] = React.useState(false)
   const [deleteConfirm, setDeleteConfirm] = React.useState<{ open: boolean; proxyId: number | null }>({ open: false, proxyId: null })
   const [bulkDeleteConfirm, setBulkDeleteConfirm] = React.useState(false)
 
@@ -236,6 +237,37 @@ export default function ProxiesPage() {
     const selectedIds = Object.keys(rowSelection).map(key => data[Number(key)].id)
     if (selectedIds.length === 0) return
     setBulkDeleteConfirm(true)
+  }
+
+  const handleBulkTest = async () => {
+    const selectedIds = Object.keys(rowSelection).map(key => data[Number(key)].id)
+    if (selectedIds.length === 0) return
+
+    try {
+      setIsBulkTesting(true)
+      const response = await api.bulkTestProxies({ ids: selectedIds })
+      const successCount = response.results.filter(result => result.status === "active").length
+      const failedCount = response.results.length - successCount
+
+      if (successCount > 0) {
+        toast.success(
+          "Bulk test completed",
+          `${successCount} passed, ${failedCount} failed`
+        )
+      } else {
+        toast.error(
+          "Bulk test failed",
+          `${failedCount} proxies failed`
+        )
+      }
+
+      fetchProxies()
+    } catch (error) {
+      console.error("Failed to bulk test proxies:", error)
+      toast.error("Failed to test proxies", error instanceof Error ? error.message : "Unknown error")
+    } finally {
+      setIsBulkTesting(false)
+    }
   }
 
   const confirmBulkDelete = async () => {
@@ -668,6 +700,14 @@ export default function ProxiesPage() {
                   <DropdownMenuItem onClick={() => handleExport("csv")}>
                     <Download className="mr-2 h-4 w-4" />
                     Export as CSV
+                  </DropdownMenuItem>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem
+                    onClick={handleBulkTest}
+                    disabled={Object.keys(rowSelection).length === 0 || isBulkTesting}
+                  >
+                    <CheckCircle2 className={`mr-2 h-4 w-4 ${isBulkTesting ? "animate-spin" : ""}`} />
+                    Test selected ({Object.keys(rowSelection).length})
                   </DropdownMenuItem>
                   <DropdownMenuSeparator />
                   <DropdownMenuItem

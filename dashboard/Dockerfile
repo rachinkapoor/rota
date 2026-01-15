@@ -19,6 +19,10 @@ RUN corepack enable && corepack prepare pnpm@10.19.0 --activate
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .
 
+# --- FIX: bake NEXT_PUBLIC_API_URL at build time ---
+ARG NEXT_PUBLIC_API_URL
+ENV NEXT_PUBLIC_API_URL=${NEXT_PUBLIC_API_URL}
+
 # Set environment variables for build
 ENV NEXT_TELEMETRY_DISABLED=1
 ENV NODE_ENV=production

@@ -619,6 +619,28 @@ export default function SettingsPage() {
             </div>
 
             <div className="space-y-2">
+              <Label htmlFor="healthcheck-retest-minutes">Retest Failed After (minutes)</Label>
+              <Input
+                id="healthcheck-retest-minutes"
+                type="number"
+                min="0"
+                value={settings.healthcheck.retest_failed_after_minutes ?? 0}
+                onChange={(e) =>
+                  setSettings({
+                    ...settings,
+                    healthcheck: {
+                      ...settings.healthcheck,
+                      retest_failed_after_minutes: parseInt(e.target.value) || 0,
+                    },
+                  })
+                }
+              />
+              <p className="text-xs text-muted-foreground">
+                0 disables automatic retesting of failed proxies
+              </p>
+            </div>
+
+            <div className="space-y-2">
               <Label htmlFor="healthcheck-url">Health Check URL</Label>
               <Input
                 id="healthcheck-url"

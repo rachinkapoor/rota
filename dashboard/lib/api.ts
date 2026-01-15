@@ -11,6 +11,8 @@ import {
   UpdateProxyRequest,
   BulkProxyRequest,
   BulkDeleteRequest,
+  BulkTestRequest,
+  BulkTestResponse,
   ProxyTestResult,
 } from "./types"
 
@@ -167,6 +169,13 @@ class ApiClient {
     message: string
   }> {
     return this.request("/api/v1/proxies/bulk-delete", {
+      method: "POST",
+      body: JSON.stringify(request),
+    })
+  }
+
+  async bulkTestProxies(request: BulkTestRequest): Promise<BulkTestResponse> {
+    return this.request("/api/v1/proxies/bulk-test", {
       method: "POST",
       body: JSON.stringify(request),
     })

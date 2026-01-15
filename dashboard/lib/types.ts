@@ -127,6 +127,7 @@ export interface Settings {
     url: string
     status: number
     headers: string[]
+    retest_failed_after_minutes: number
   }
   log_retention: {
     enabled: boolean
@@ -169,6 +170,15 @@ export interface BulkProxyRequest {
 
 export interface BulkDeleteRequest {
   ids: number[]
+}
+
+export interface BulkTestRequest {
+  ids: number[]
+}
+
+export interface BulkTestResponse {
+  tested: number
+  results: ProxyTestResult[]
 }
 
 export interface ProxyTestResult {
