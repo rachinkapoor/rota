@@ -8,12 +8,15 @@ import (
 
 // Config holds all application configuration
 type Config struct {
-	ProxyPort int
-	APIPort   int
-	LogLevel  string
-	Database  DatabaseConfig
-	AdminUser string
-	AdminPass string
+	ProxyPort                int
+	APIPort                  int
+	LogLevel                 string
+	Database                 DatabaseConfig
+	AdminUser                string
+	AdminPass                string
+	WebshareAPIKey           string
+	WebshareSyncIntervalSeconds int
+	WebshareMode             string
 }
 
 // DatabaseConfig holds database configuration
@@ -48,8 +51,11 @@ func Load() (*Config, error) {
 			Name:     getEnv("DB_NAME", "rota"),
 			SSLMode:  getEnv("DB_SSLMODE", "disable"),
 		},
-		AdminUser: getEnv("ROTA_ADMIN_USER", "admin"),
-		AdminPass: getEnv("ROTA_ADMIN_PASSWORD", "admin"),
+		AdminUser:                getEnv("ROTA_ADMIN_USER", "admin"),
+		AdminPass:                getEnv("ROTA_ADMIN_PASSWORD", "admin"),
+		WebshareAPIKey:           getEnv("WEBSHARE_API_KEY", ""),
+		WebshareSyncIntervalSeconds: getEnvAsInt("WEBSHARE_SYNC_INTERVAL_SECONDS", 0),
+		WebshareMode:             getEnv("WEBSHARE_MODE", "direct"),
 	}
 
 	if err := cfg.Validate(); err != nil {
@@ -79,6 +85,11 @@ func (c *Config) Validate() error {
 	}
 	if !validLogLevels[c.LogLevel] {
 		return fmt.Errorf("invalid log level: %s (must be debug, info, warn, or error)", c.LogLevel)
+	}
+
+	// Validate Webshare mode
+	if c.WebshareMode != "" && c.WebshareMode != "direct" && c.WebshareMode != "backbone" {
+		return fmt.Errorf("invalid webshare mode: %s (must be direct or backbone)", c.WebshareMode)
 	}
 
 	return nil

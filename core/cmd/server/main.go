@@ -141,6 +141,21 @@ func run() error {
 	}
 	apiServer := api.New(cfg, log, db)
 
+	// Create and start Webshare sync scheduler
+	var webshareScheduler *services.WebshareScheduler
+	if cfg.WebshareAPIKey != "" && cfg.WebshareSyncIntervalSeconds > 0 {
+		webshareSyncService := apiServer.GetWebshareSyncService()
+		if webshareSyncService != nil {
+			webshareScheduler = services.NewWebshareScheduler(
+				webshareSyncService,
+				cfg.WebshareSyncIntervalSeconds,
+				log,
+			)
+			webshareScheduler.Start(ctx)
+			defer webshareScheduler.Stop()
+		}
+	}
+
 	// Set proxy server reference in API server for reload functionality
 	apiServer.SetProxyServer(proxyServer)
 

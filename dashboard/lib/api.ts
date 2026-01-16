@@ -14,6 +14,8 @@ import {
   BulkTestRequest,
   BulkTestResponse,
   ProxyTestResult,
+  WebshareSyncResponse,
+  WebshareSyncStatusResponse,
 } from "./types"
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8001"
@@ -209,6 +211,17 @@ class ApiClient {
     return this.request("/api/v1/proxies/reload", {
       method: "POST",
     })
+  }
+
+  // Webshare
+  async syncWebshare(): Promise<WebshareSyncResponse> {
+    return this.request<WebshareSyncResponse>("/api/v1/webshare/sync", {
+      method: "POST",
+    })
+  }
+
+  async getWebshareSyncStatus(): Promise<WebshareSyncStatusResponse> {
+    return this.request<WebshareSyncStatusResponse>("/api/v1/webshare/sync/status")
   }
 
   // Logs
