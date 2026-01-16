@@ -73,7 +73,7 @@ import {
 import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { api } from "@/lib/api"
-import { Proxy } from "@/lib/types"
+import { Proxy, WebshareSyncStatusResponse } from "@/lib/types"
 import { toast } from "@/lib/toast"
 
 export default function ProxiesPage() {
@@ -119,6 +119,11 @@ export default function ProxiesPage() {
   const [isBulkTesting, setIsBulkTesting] = React.useState(false)
   const [deleteConfirm, setDeleteConfirm] = React.useState<{ open: boolean; proxyId: number | null }>({ open: false, proxyId: null })
   const [bulkDeleteConfirm, setBulkDeleteConfirm] = React.useState(false)
+  
+  // Webshare sync states
+  const [webshareSyncStatus, setWebshareSyncStatus] = React.useState<WebshareSyncStatusResponse | null>(null)
+  const [isSyncingWebshare, setIsSyncingWebshare] = React.useState(false)
+  const prevSyncStatusRef = React.useRef<string | undefined>(undefined)
 
   // Debounce search query
   React.useEffect(() => {
@@ -436,6 +441,90 @@ export default function ProxiesPage() {
       toast.error('Failed to reload proxy pool', error instanceof Error ? error.message : "Unknown error")
     } finally {
       setIsReloading(false)
+    }
+  }
+
+  const fetchWebshareSyncStatus = React.useCallback(async () => {
+    try {
+      const status = await api.getWebshareSyncStatus()
+      const currentSyncStatus = status.current_sync?.status
+      const wasSyncing = prevSyncStatusRef.current === "IN-PROGRESS"
+      const isNowCompleted = currentSyncStatus !== "IN-PROGRESS" && wasSyncing
+      
+      setWebshareSyncStatus(status)
+      setIsSyncingWebshare(currentSyncStatus === "IN-PROGRESS" || false)
+      
+      // If sync just completed, refresh the proxies table
+      if (isNowCompleted) {
+        fetchProxies()
+      }
+      
+      prevSyncStatusRef.current = currentSyncStatus
+    } catch (error) {
+      console.error('Failed to fetch Webshare sync status:', error)
+      // Set status with has_api_key: false on error to show the error message
+      setWebshareSyncStatus({
+        has_api_key: false,
+      })
+    }
+  }, [fetchProxies])
+
+  const handleSyncWebshare = async () => {
+    try {
+      setIsSyncingWebshare(true)
+      const response = await api.syncWebshare()
+      if (response.status === "already_running") {
+        toast.error('Sync already in progress', 'A sync is already running')
+      } else {
+        toast.success('Sync started', 'Webshare synchronization has been started')
+        // Set previous status to track completion
+        prevSyncStatusRef.current = "IN-PROGRESS"
+      }
+      // Refresh status immediately
+      await fetchWebshareSyncStatus()
+    } catch (error) {
+      console.error('Failed to sync Webshare:', error)
+      toast.error('Failed to start sync', error instanceof Error ? error.message : "Unknown error")
+    } finally {
+      setIsSyncingWebshare(false)
+    }
+  }
+
+  // Initial fetch of Webshare sync status
+  React.useEffect(() => {
+    fetchWebshareSyncStatus()
+  }, [fetchWebshareSyncStatus])
+
+  // Polling for Webshare sync status
+  React.useEffect(() => {
+    if (!webshareSyncStatus?.has_api_key) {
+      return
+    }
+
+    const isSyncing = webshareSyncStatus.current_sync?.status === "IN-PROGRESS"
+    const interval = isSyncing ? 2000 : 10000 // 2s when syncing, 10s when not
+
+    const pollInterval = setInterval(() => {
+      fetchWebshareSyncStatus()
+    }, interval)
+
+    return () => clearInterval(pollInterval)
+  }, [fetchWebshareSyncStatus, webshareSyncStatus?.current_sync?.status, webshareSyncStatus?.has_api_key])
+
+  // Format timestamp to local time
+  const formatLocalTime = (timestamp: string | null | undefined): string => {
+    if (!timestamp) return "NA"
+    try {
+      const date = new Date(timestamp)
+      return date.toLocaleString('en-US', {
+        hour: '2-digit',
+        minute: '2-digit',
+        day: '2-digit',
+        month: 'short',
+        year: '2-digit',
+      })
+    } catch {
+      return "NA"
     }
   }
 
@@ -897,6 +986,53 @@ export default function ProxiesPage() {
             </div>
           </div>
         </CardContent>
+      </Card>
+
+      {/* Webshare Sync Status Card */}
+      <Card>
+        <CardHeader>
+          <div className="flex items-center justify-between">
+            <div>
+              <CardTitle>Webshare Sync Status</CardTitle>
+              {webshareSyncStatus === null || !webshareSyncStatus.has_api_key ? (
+                <CardDescription className="text-red-600">
+                  Please configure Webshare API KEY
+                </CardDescription>
+              ) : (
+                <CardDescription>
+                  {webshareSyncStatus.last_sync ? (
+                    <>
+                      Last Sync: {formatLocalTime(webshareSyncStatus.last_sync.synced_at)}
+                      {webshareSyncStatus.next_sync_time && " • "}
+                      {webshareSyncStatus.next_sync_time && (
+                        <>Next Sync: {formatLocalTime(webshareSyncStatus.next_sync_time)}</>
+                      )}
+                    </>
+                  ) : (
+                    <>
+                      Last Sync: NA
+                      {webshareSyncStatus.next_sync_time && " • "}
+                      {webshareSyncStatus.next_sync_time && (
+                        <>Next Sync: {formatLocalTime(webshareSyncStatus.next_sync_time)}</>
+                      )}
+                      {!webshareSyncStatus.next_sync_time && " • Next Sync: NA"}
+                    </>
+                  )}
+                </CardDescription>
+              )}
+            </div>
+            {webshareSyncStatus && webshareSyncStatus.has_api_key && (
+              <Button
+                variant="outline"
+                onClick={handleSyncWebshare}
+                disabled={isSyncingWebshare}
+              >
+                <Loader2 className={`mr-2 h-4 w-4 ${isSyncingWebshare ? 'animate-spin' : ''}`} />
+                Sync Now
+              </Button>
+            )}
+          </div>
+        </CardHeader>
       </Card>
 
       {/* Add Proxy Dialog */}

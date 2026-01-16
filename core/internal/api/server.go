@@ -13,6 +13,7 @@ import (
 	"github.com/alpkeskin/rota/core/internal/database"
 	"github.com/alpkeskin/rota/core/internal/proxy"
 	"github.com/alpkeskin/rota/core/internal/repository"
+	"github.com/alpkeskin/rota/core/internal/services"
 	"github.com/alpkeskin/rota/core/pkg/logger"
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
@@ -38,6 +39,9 @@ type Server struct {
 	// Proxy server reference for reloading
 	proxyServer ProxyServer
 
+	// Webshare sync service (for scheduler)
+	webshareSyncService *services.WebshareSyncService
+
 	// Handlers
 	authHandler          *handlers.AuthHandler
 	healthHandler        *handlers.HealthHandler
@@ -48,6 +52,7 @@ type Server struct {
 	websocketHandler     *handlers.WebSocketHandler
 	metricsHandler       *handlers.MetricsHandler
 	documentationHandler *handlers.DocumentationHandler
+	webshareHandler      *handlers.WebshareHandler
 }
 
 // New creates a new API server instance
@@ -57,6 +62,7 @@ func New(cfg *config.Config, log *logger.Logger, db *database.DB) *Server {
 	logRepo := repository.NewLogRepository(db)
 	settingsRepo := repository.NewSettingsRepository(db)
 	dashboardRepo := repository.NewDashboardRepository(db)
+	webshareRepo := repository.NewWebshareRepository(db)
 
 	// Generate random JWT secret on startup
 	// This ensures all previous tokens become invalid on restart
@@ -68,6 +74,38 @@ func New(cfg *config.Config, log *logger.Logger, db *database.DB) *Server {
 
 	// Create health checker for testing proxies
 	healthChecker := proxy.NewHealthChecker(proxyRepo, settingsRepo, tracker, log)
+
+	// Initialize Webshare sync service and handler
+	hasAPIKey := cfg.WebshareAPIKey != ""
+	var webshareSyncService *services.WebshareSyncService
+	var webshareHandler *handlers.WebshareHandler
+	if hasAPIKey {
+		webshareSyncService = services.NewWebshareSyncService(
+			cfg.WebshareAPIKey,
+			webshareRepo,
+			proxyRepo,
+			healthChecker,
+			cfg.WebshareMode,
+			cfg.WebshareSyncIntervalSeconds,
+			log,
+		)
+		webshareHandler = handlers.NewWebshareHandler(
+			webshareSyncService,
+			webshareRepo,
+			hasAPIKey,
+			cfg.WebshareSyncIntervalSeconds,
+			log,
+		)
+	} else {
+		// Create handler even without API key to return proper error messages
+		webshareHandler = handlers.NewWebshareHandler(
+			nil,
+			webshareRepo,
+			hasAPIKey,
+			cfg.WebshareSyncIntervalSeconds,
+			log,
+		)
+	}
 
 	// Initialize handlers
 	authHandler := handlers.NewAuthHandler(settingsRepo, log, jwtSecret, cfg.AdminUser, cfg.AdminPass)
@@ -94,6 +132,8 @@ func New(cfg *config.Config, log *logger.Logger, db *database.DB) *Server {
 		websocketHandler:     websocketHandler,
 		metricsHandler:       metricsHandler,
 		documentationHandler: documentationHandler,
+		webshareHandler:      webshareHandler,
+		webshareSyncService:  webshareSyncService,
 	}
 
 	s.setupMiddleware()
@@ -178,6 +218,10 @@ func (s *Server) setupRoutes() {
 		r.Get("/settings", s.settingsHandler.Get)
 		r.Put("/settings", s.settingsHandler.Update)
 		r.Post("/settings/reset", s.settingsHandler.Reset)
+
+		// Webshare sync
+		r.Post("/webshare/sync", s.webshareHandler.Sync)
+		r.Get("/webshare/sync/status", s.webshareHandler.GetStatus)
 	})
 
 	// WebSocket routes
@@ -244,6 +288,11 @@ func (s *Server) serveSwaggerJSON(w http.ResponseWriter, r *http.Request) {
 	// Serve from the docs directory in the project root
 	swaggerPath := "docs/swagger.json"
 	http.ServeFile(w, r, swaggerPath)
+}
+
+// GetWebshareSyncService returns the Webshare sync service
+func (s *Server) GetWebshareSyncService() *services.WebshareSyncService {
+	return s.webshareSyncService
 }
 
 // generateJWTSecret generates a cryptographically secure random JWT secret

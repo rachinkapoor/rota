@@ -267,6 +267,32 @@ var migrations = []Migration{
 			WHERE key = 'rotation';
 		`,
 	},
+	{
+		Version:     12,
+		Description: "Create webshare_sync_status table",
+		Up: `
+			CREATE TABLE IF NOT EXISTS webshare_sync_status (
+				id SERIAL PRIMARY KEY,
+				synced_at TIMESTAMP NOT NULL,
+				status VARCHAR(20) NOT NULL CHECK (status IN ('IN-PROGRESS', 'FAILED', 'SUCCESS')),
+				error TEXT,
+				logs TEXT,
+				ip_removed TEXT,
+				ip_added TEXT,
+				ip_replaced TEXT,
+				created_at TIMESTAMP DEFAULT NOW(),
+				updated_at TIMESTAMP DEFAULT NOW()
+			);
+
+			CREATE INDEX idx_webshare_sync_status_synced_at ON webshare_sync_status(synced_at DESC);
+			CREATE INDEX idx_webshare_sync_status_status ON webshare_sync_status(status);
+		`,
+		Down: `
+			DROP INDEX IF EXISTS idx_webshare_sync_status_status;
+			DROP INDEX IF EXISTS idx_webshare_sync_status_synced_at;
+			DROP TABLE IF EXISTS webshare_sync_status;
+		`,
+	},
 }
 
 // Migrate runs all pending migrations

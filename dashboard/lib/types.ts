@@ -190,3 +190,24 @@ export interface ProxyTestResult {
   tested_at: string
   duration?: number // Alias for response_time for better clarity
 }
+
+// Webshare Types
+export interface WebshareSyncInfo {
+  synced_at: string
+  status: "IN-PROGRESS" | "FAILED" | "SUCCESS"
+  ip_removed?: string[]
+  ip_added?: string[]
+  ip_replaced?: string[]
+}
+
+export interface WebshareSyncStatusResponse {
+  last_sync?: WebshareSyncInfo
+  current_sync?: WebshareSyncInfo
+  next_sync_time?: string | null
+  has_api_key: boolean
+}
+
+export interface WebshareSyncResponse {
+  status: "started" | "already_running"
+  message: string
+}

@@ -22,6 +22,9 @@ services:
       - DB_SSLMODE=disable
       - ROTA_ADMIN_USER=admin
       - ROTA_ADMIN_PASSWORD=admin
+      - WEBSHARE_SYNC_INTERVAL_SECONDS=3600
+      - WEBSHARE_MODE=direct
+      - WEBSHARE_API_KEY=7zxiiprjnzdtdvzgqv147f1vtlt6zabnonnxef60
     networks:
       - rota-network
     healthcheck:
