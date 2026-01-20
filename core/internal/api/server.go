@@ -143,6 +143,9 @@ func (s *Server) setupRoutes() {
 
 	// API v1 routes
 	s.router.Route("/api/v1", func(r chi.Router) {
+		// Health (alias for /health)
+		r.Get("/health", s.healthHandler.Health)
+
 		// Authentication
 		r.Post("/auth/login", s.authHandler.Login)
 
@@ -164,6 +167,7 @@ func (s *Server) setupRoutes() {
 		r.Post("/proxies", s.proxyHandler.Create)
 		r.Post("/proxies/bulk", s.proxyHandler.BulkCreate)
 		r.Post("/proxies/bulk-delete", s.proxyHandler.BulkDelete)
+		r.Post("/proxies/bulk-test", s.proxyHandler.BulkTest)
 		r.Get("/proxies/export", s.proxyHandler.Export)
 		r.Put("/proxies/{id}", s.proxyHandler.Update)
 		r.Delete("/proxies/{id}", s.proxyHandler.Delete)
@@ -208,6 +212,7 @@ func (s *Server) SetProxyServer(ps ProxyServer) {
 }
 
 // ReloadProxyPool reloads the proxy pool from database
+//
 //	@Summary		Reload proxy pool
 //	@Description	Reload proxy pool from database
 //	@Tags			proxies

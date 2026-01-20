@@ -267,6 +267,25 @@ var migrations = []Migration{
 			WHERE key = 'rotation';
 		`,
 	},
+	{
+		Version:     12,
+		Description: "Add healthcheck retest_failed_after_minutes setting",
+		Up: `
+			UPDATE settings
+			SET value = jsonb_set(
+				value,
+				'{retest_failed_after_minutes}',
+				'0'::jsonb
+			)
+			WHERE key = 'healthcheck'
+			AND NOT (value ? 'retest_failed_after_minutes');
+		`,
+		Down: `
+			UPDATE settings
+			SET value = value - 'retest_failed_after_minutes'
+			WHERE key = 'healthcheck';
+		`,
+	},
 }
 
 // Migrate runs all pending migrations

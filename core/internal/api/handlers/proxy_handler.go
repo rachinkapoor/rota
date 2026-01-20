@@ -7,6 +7,7 @@ import (
 	"math"
 	"net/http"
 	"strconv"
+	"time"
 
 	"github.com/alpkeskin/rota/core/internal/models"
 	"github.com/alpkeskin/rota/core/internal/repository"
@@ -36,6 +37,7 @@ func NewProxyHandler(proxyRepo *repository.ProxyRepository, healthChecker Health
 }
 
 // List handles proxy listing with pagination and filters
+//
 //	@Summary		List proxies
 //	@Description	Get paginated list of proxies with optional filters
 //	@Tags			proxies
@@ -93,6 +95,7 @@ func (h *ProxyHandler) List(w http.ResponseWriter, r *http.Request) {
 }
 
 // Create handles proxy creation
+//
 //	@Summary		Create proxy
 //	@Description	Create a new proxy server
 //	@Tags			proxies
@@ -131,6 +134,7 @@ func (h *ProxyHandler) Create(w http.ResponseWriter, r *http.Request) {
 }
 
 // BulkCreate handles bulk proxy creation
+//
 //	@Summary		Bulk create proxies
 //	@Description	Create multiple proxy servers at once
 //	@Tags			proxies
@@ -185,6 +189,7 @@ func (h *ProxyHandler) BulkCreate(w http.ResponseWriter, r *http.Request) {
 }
 
 // Update handles proxy update
+//
 //	@Summary		Update proxy
 //	@Description	Update an existing proxy server
 //	@Tags			proxies
@@ -227,6 +232,7 @@ func (h *ProxyHandler) Update(w http.ResponseWriter, r *http.Request) {
 }
 
 // Delete handles proxy deletion
+//
 //	@Summary		Delete proxy
 //	@Description	Delete a proxy server by ID
 //	@Tags			proxies
@@ -253,6 +259,7 @@ func (h *ProxyHandler) Delete(w http.ResponseWriter, r *http.Request) {
 }
 
 // BulkDelete handles bulk proxy deletion
+//
 //	@Summary		Bulk delete proxies
 //	@Description	Delete multiple proxy servers at once
 //	@Tags			proxies
@@ -290,7 +297,88 @@ func (h *ProxyHandler) BulkDelete(w http.ResponseWriter, r *http.Request) {
 	h.jsonResponse(w, http.StatusOK, response)
 }
 
+// BulkTest handles testing multiple proxies
+//
+//	@Summary		Bulk test proxies
+//	@Description	Test multiple proxy servers at once
+//	@Tags			proxies
+//	@Accept			json
+//	@Produce		json
+//	@Param			request	body		models.BulkTestRequest	true	"List of proxy IDs to test"
+//	@Success		200		{object}	models.BulkTestResponse	"Test results"
+//	@Failure		400		{object}	models.ErrorResponse
+//	@Failure		500		{object}	models.ErrorResponse
+//	@Router			/proxies/bulk-test [post]
+func (h *ProxyHandler) BulkTest(w http.ResponseWriter, r *http.Request) {
+	var req models.BulkTestRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		h.errorResponse(w, http.StatusBadRequest, "Invalid request body")
+		return
+	}
+
+	if len(req.IDs) == 0 {
+		h.errorResponse(w, http.StatusBadRequest, "At least one proxy ID is required")
+		return
+	}
+
+	results := make([]models.ProxyTestResult, 0, len(req.IDs))
+	for _, id := range req.IDs {
+		proxy, err := h.proxyRepo.GetByID(r.Context(), id)
+		if err != nil {
+			h.logger.Error("failed to get proxy", "error", err, "proxy_id", id)
+			h.errorResponse(w, http.StatusInternalServerError, "Failed to get proxy")
+			return
+		}
+
+		if proxy == nil {
+			errMsg := "Proxy not found"
+			results = append(results, models.ProxyTestResult{
+				ID:       id,
+				Status:   "failed",
+				Error:    &errMsg,
+				TestedAt: time.Now(),
+			})
+			continue
+		}
+
+		result, err := h.healthChecker.CheckProxy(r.Context(), proxy)
+		if err != nil {
+			errMsg := err.Error()
+			results = append(results, models.ProxyTestResult{
+				ID:       proxy.ID,
+				Address:  proxy.Address,
+				Status:   "failed",
+				Error:    &errMsg,
+				TestedAt: time.Now(),
+			})
+			continue
+		}
+
+		if result != nil {
+			results = append(results, *result)
+			continue
+		}
+
+		errMsg := "Proxy test failed"
+		results = append(results, models.ProxyTestResult{
+			ID:       proxy.ID,
+			Address:  proxy.Address,
+			Status:   "failed",
+			Error:    &errMsg,
+			TestedAt: time.Now(),
+		})
+	}
+
+	response := models.BulkTestResponse{
+		Tested:  len(results),
+		Results: results,
+	}
+
+	h.jsonResponse(w, http.StatusOK, response)
+}
+
 // Test handles proxy testing
+//
 //	@Summary		Test proxy
 //	@Description	Test a proxy server's connectivity and performance
 //	@Tags			proxies
@@ -341,6 +429,7 @@ func (h *ProxyHandler) Test(w http.ResponseWriter, r *http.Request) {
 }
 
 // Export handles proxy export
+//
 //	@Summary		Export proxies
 //	@Description	Export proxy list in various formats (txt, json, csv)
 //	@Tags			proxies

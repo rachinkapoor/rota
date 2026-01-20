@@ -2,6 +2,7 @@ package proxy
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"io"
 	"net"
@@ -14,6 +15,8 @@ import (
 	"github.com/alpkeskin/rota/core/pkg/logger"
 	"github.com/elazarl/goproxy"
 )
+
+var startTime = time.Now()
 
 // Server represents the proxy server
 type Server struct {
@@ -174,7 +177,19 @@ func New(
 			"path", r.URL.Path,
 			"host", r.Host,
 		)
-		
+
+		if r.URL.Path == "/health" && r.Method == http.MethodGet {
+			response := map[string]interface{}{
+				"status":  "healthy",
+				"version": "1.0.0",
+				"uptime":  int(time.Since(startTime).Seconds()),
+			}
+			w.Header().Set("Content-Type", "application/json")
+			w.WriteHeader(http.StatusOK)
+			_ = json.NewEncoder(w).Encode(response)
+			return
+		}
+
 		// Check if this is a direct HTTP request to /hyperliquid/*
 		if r.URL.Path == "/hyperliquid" || strings.HasPrefix(r.URL.Path, "/hyperliquid/") {
 			log.Info("intercepting hyperliquid request",
@@ -183,7 +198,7 @@ func New(
 			)
 			// This is a direct HTTP request, not a proxy request
 			// Handle it directly by calling the handler logic
-			
+
 			// Extract the path after /hyperliquid
 			hyperliquidPath := strings.TrimPrefix(r.URL.Path, "/hyperliquid")
 			if hyperliquidPath == "" {
@@ -212,7 +227,7 @@ func New(
 			newReq.Header.Set("Host", "api.hyperliquid.xyz")
 			// Ensure RequestURI is cleared for client requests
 			newReq.RequestURI = ""
-			
+
 			// Create a proxy context for the handler
 			// The handler uses ctx.Req.Context(), so we need to set Req to newReq
 			proxyCtx := &goproxy.ProxyCtx{
@@ -248,7 +263,7 @@ func New(
 					}
 				}
 				w.WriteHeader(resp.StatusCode)
-				
+
 				// Copy response body
 				if resp.Body != nil {
 					defer resp.Body.Close()

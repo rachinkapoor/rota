@@ -25,6 +25,7 @@ func NewSettingsHandler(settingsRepo *repository.SettingsRepository, log *logger
 }
 
 // Get handles getting current configuration
+//
 //	@Summary		Get settings
 //	@Description	Get current system configuration
 //	@Tags			settings
@@ -47,6 +48,7 @@ func (h *SettingsHandler) Get(w http.ResponseWriter, r *http.Request) {
 }
 
 // Update handles updating configuration
+//
 //	@Summary		Update settings
 //	@Description	Update system configuration
 //	@Tags			settings
@@ -100,6 +102,7 @@ func (h *SettingsHandler) Update(w http.ResponseWriter, r *http.Request) {
 }
 
 // Reset handles resetting configuration to defaults
+//
 //	@Summary		Reset settings
 //	@Description	Reset configuration to default values
 //	@Tags			settings
@@ -149,6 +152,11 @@ func (h *SettingsHandler) validateSettings(s *models.Settings) error {
 	// Validate healthcheck workers
 	if s.HealthCheck.Workers < 1 || s.HealthCheck.Workers > 100 {
 		return fmt.Errorf("healthcheck.workers must be between 1 and 100")
+	}
+
+	// Validate healthcheck retest window (minutes)
+	if s.HealthCheck.RetestFailedAfterMinutes < 0 || s.HealthCheck.RetestFailedAfterMinutes > 10080 {
+		return fmt.Errorf("healthcheck.retest_failed_after_minutes must be between 0 and 10080")
 	}
 
 	return nil

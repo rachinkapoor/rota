@@ -44,7 +44,7 @@ type TimeBasedSettings struct {
 // RateLimitedSettings represents rate-limited rotation settings
 type RateLimitedSettings struct {
 	MaxRequestsPerMinute int `json:"max_requests_per_minute"` // Maximum requests per proxy per time window (default: 30)
-	WindowSeconds        int `json:"window_seconds"`           // Time window in seconds (default: 60)
+	WindowSeconds        int `json:"window_seconds"`          // Time window in seconds (default: 60)
 }
 
 // RateLimitSettings represents rate limiting configuration
@@ -56,11 +56,12 @@ type RateLimitSettings struct {
 
 // HealthCheckSettings represents health check configuration
 type HealthCheckSettings struct {
-	Timeout int      `json:"timeout"`
-	Workers int      `json:"workers"`
-	URL     string   `json:"url"`
-	Status  int      `json:"status"`
-	Headers []string `json:"headers"`
+	Timeout                  int      `json:"timeout"`
+	Workers                  int      `json:"workers"`
+	URL                      string   `json:"url"`
+	Status                   int      `json:"status"`
+	Headers                  []string `json:"headers"`
+	RetestFailedAfterMinutes int      `json:"retest_failed_after_minutes"`
 }
 
 // LogRetentionSettings represents log retention and cleanup configuration

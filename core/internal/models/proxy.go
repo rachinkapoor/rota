@@ -4,20 +4,20 @@ import "time"
 
 // Proxy represents a proxy server
 type Proxy struct {
-	ID                 int       `json:"id"`
-	Address            string    `json:"address"`
-	Protocol           string    `json:"protocol"`
-	Username           *string   `json:"username,omitempty"`
-	Password           *string   `json:"-"` // Never expose password in JSON
-	Status             string    `json:"status"`
-	Requests           int64     `json:"requests"`
-	SuccessfulRequests int64     `json:"-"`
-	FailedRequests     int64     `json:"-"`
-	AvgResponseTime    int       `json:"avg_response_time"`
+	ID                 int        `json:"id"`
+	Address            string     `json:"address"`
+	Protocol           string     `json:"protocol"`
+	Username           *string    `json:"username,omitempty"`
+	Password           *string    `json:"-"` // Never expose password in JSON
+	Status             string     `json:"status"`
+	Requests           int64      `json:"requests"`
+	SuccessfulRequests int64      `json:"-"`
+	FailedRequests     int64      `json:"-"`
+	AvgResponseTime    int        `json:"avg_response_time"`
 	LastCheck          *time.Time `json:"last_check,omitempty"`
-	LastError          *string   `json:"-"`
-	CreatedAt          time.Time `json:"created_at"`
-	UpdatedAt          time.Time `json:"updated_at"`
+	LastError          *string    `json:"-"`
+	CreatedAt          time.Time  `json:"created_at"`
+	UpdatedAt          time.Time  `json:"updated_at"`
 }
 
 // ProxyWithStats represents a proxy with calculated statistics
@@ -61,14 +61,25 @@ type BulkDeleteProxyRequest struct {
 	IDs []int `json:"ids" validate:"required,min=1"`
 }
 
+// BulkTestRequest represents a request to test multiple proxies
+type BulkTestRequest struct {
+	IDs []int `json:"ids" validate:"required,min=1"`
+}
+
+// BulkTestResponse represents the results of testing multiple proxies
+type BulkTestResponse struct {
+	Tested  int               `json:"tested"`
+	Results []ProxyTestResult `json:"results"`
+}
+
 // ProxyTestResult represents the result of testing a proxy
 type ProxyTestResult struct {
-	ID           int        `json:"id"`
-	Address      string     `json:"address"`
-	Status       string     `json:"status"`
-	ResponseTime *int       `json:"response_time,omitempty"`
-	Error        *string    `json:"error,omitempty"`
-	TestedAt     time.Time  `json:"tested_at"`
+	ID           int       `json:"id"`
+	Address      string    `json:"address"`
+	Status       string    `json:"status"`
+	ResponseTime *int      `json:"response_time,omitempty"`
+	Error        *string   `json:"error,omitempty"`
+	TestedAt     time.Time `json:"tested_at"`
 }
 
 // ProxyListResponse represents a paginated list of proxies
